@@ -1,0 +1,29 @@
+# Project-wide settings for the git hooks in .githooks/.
+#
+# This file is tracked, so its values apply to everyone who clones the
+# repository. A per-clone `git config hooks.<name> <value>` overrides it.
+# The commented lines show the built-in defaults; uncomment one to change it.
+[hooks]
+	# Branches that cannot be deleted or force-pushed.
+	# protectedBranches = main master
+
+	# Refuse any direct push to an existing protected branch, so changes go
+	# through a pull request. Use it where the hosting platform cannot enforce
+	# that itself.
+	# blockProtectedPush = false
+
+	# Refuse to push commits that are not signed.
+	# requireSigned = true
+
+	# Check branch names: <type>/<description>, e.g. feat/add-user-subjects.
+	# enforceBranchNames = true
+
+	# Require a ticket key in the branch name: <type>/<TICKET>-<description>,
+	# e.g. feat/TIC-123-add-user-subjects.
+	# requireTicket = false
+
+	# Branch types that may omit the ticket when requireTicket is on.
+	# ticketlessTypes = chore
+
+	# Largest file pre-commit accepts, in KB.
+	# maxFileSizeKB = 1024
