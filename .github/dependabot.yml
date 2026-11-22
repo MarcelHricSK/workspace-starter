@@ -1,0 +1,36 @@
+version: 2
+updates:
+  # Keeps the SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    # Wait a week before proposing a new release: most malicious or broken
+    # releases are caught and pulled within days.
+    cooldown:
+      default-days: 7
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+    open-pull-requests-limit: 5
+
+  # Add one block per package ecosystem the project uses, for example:
+  #
+  # - package-ecosystem: npm        # also covers pnpm and yarn
+  #   directory: /
+  #   schedule:
+  #     interval: weekly
+  #   cooldown:
+  #     default-days: 7
+  #   groups:
+  #     minor-and-patch:
+  #       update-types: [minor, patch]
+  #   commit-message:
+  #     prefix: chore
+  #     include: scope
+  #
+  # Other ecosystems: pub (Dart/Flutter), pip, uv, gomod, cargo, docker,
+  # docker-compose, terraform, gradle, maven, bundler, composer, nuget.

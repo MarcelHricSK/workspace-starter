@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+# Enforces Conventional Commits on the subject line:
+#   <type>(<optional scope>)!: <description>
+set -euo pipefail
+
+msg_file=$1
+subject=$(grep -vE '^[[:space:]]*(#|$)' "$msg_file" | head -n 1 || true)
+
+# Let git's own generated messages through.
+case "$subject" in
+  "Merge "* | "Revert "* | "fixup! "* | "squash! "* | "amend! "*) exit 0 ;;
+esac
+
+types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
+pattern="^(${types})(\([a-z0-9._/-]+\))?!?: [^[:space:]].*"
+
+if ! [[ "$subject" =~ $pattern ]]; then
+  {
+    printf 'commit-msg: subject does not follow Conventional Commits:\n  %s\n\n' "$subject"
+    printf 'Expected: <type>(<scope>)!: <description>\n'
+    printf 'Types:    %s\n' "${types//|/, }"
+    printf 'Example:  feat(auth): add passkey login\n'
+  } >&2
+  exit 1
+fi
+
+if [ "${#subject}" -gt 100 ]; then
+  printf 'commit-msg: subject is %s characters (max 100).\n' "${#subject}" >&2
+  exit 1
+fi

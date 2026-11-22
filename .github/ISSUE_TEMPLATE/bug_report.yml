@@ -1,0 +1,35 @@
+name: Bug report
+description: Something does not work as documented or expected.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not report security vulnerabilities here. Use the private channel described in SECURITY.md.
+        Remove secrets, tokens and personal data from logs before pasting them.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Version or commit, OS, runtime versions.
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      render: shell

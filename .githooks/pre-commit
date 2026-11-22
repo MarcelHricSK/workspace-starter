@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+# Blocks commits that contain secrets, forbidden files, unresolved merge
+# conflicts or oversized files. Enabled by scripts/setup.sh.
+set -euo pipefail
+
+hook_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$(git rev-parse --show-toplevel)"
+# shellcheck source=.githooks/_settings.sh
+. "$hook_dir/_settings.sh"
+status=0
+say() { printf 'pre-commit: %s\n' "$*" >&2; }
+
+# 1. Secrets and files that must never be committed. Fails closed if the
+#    scanner is missing.
+if [ -x scripts/scan-secrets.sh ]; then
+  scripts/scan-secrets.sh --staged || status=1
+else
+  say "scripts/scan-secrets.sh is missing or not executable; refusing to commit."
+  status=1
+fi
+
+# 2. Unresolved merge conflict markers in added lines.
+if git diff --cached -U0 --no-color --no-ext-diff --diff-filter=ACMR |
+  grep -E '^\+(<<<<<<<|>>>>>>>)( |$)' >/dev/null; then
+  say "unresolved merge conflict markers in staged changes."
+  status=1
+fi
+
+# 3. Oversized files (default 1024 KB; set hooks.maxFileSizeKB in .hooksconfig
+#    or per clone with `git config hooks.maxFileSizeKB <n>`).
+limit_kb=$(hook_setting maxFileSizeKB 1024 int)
+limit_bytes=$((limit_kb * 1024))
+while IFS= read -r -d '' f; do
+  size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+  if [ "$size" -gt "$limit_bytes" ]; then
+    say "$f is $((size / 1024)) KB (limit ${limit_kb} KB). Use Git LFS or keep it out of the repo."
+    status=1
+  fi
+done < <(git diff --cached --name-only -z --diff-filter=ACMR)
+
+exit "$status"

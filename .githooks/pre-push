@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Before anything leaves the machine:
+#   - refuse to delete or force-push protected branches,
+#   - optionally refuse any direct push to a protected branch,
+#   - re-scan every outgoing commit for secrets (catches `commit --no-verify`),
+#   - refuse outgoing commits that are not signed,
+#   - refuse branches whose name does not follow the convention.
+#
+# Settings come from per-clone git config, then the tracked .hooksconfig, then
+# the defaults below. See .hooksconfig for what each one does.
+set -euo pipefail
+
+remote_name=${1:-origin}
+hook_dir=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+cd "$(git rev-parse --show-toplevel)"
+# shellcheck source=.githooks/_settings.sh
+. "$hook_dir/_settings.sh"
+
+say() { printf 'pre-push: %s\n' "$*" >&2; }
+
+protected=$(hook_setting protectedBranches "main master")
+block_protected=$(hook_setting blockProtectedPush false bool)
+require_signed=$(hook_setting requireSigned true bool)
+enforce_names=$(hook_setting enforceBranchNames true bool)
+require_ticket=$(hook_setting requireTicket false bool)
+ticketless_types=$(hook_setting ticketlessTypes chore)
+
+# Prints "<short id> <subject>" for each commit in the range that carries no
+# signature. Presence only: GitHub verifies the signature itself on push.
+unsigned_commits() {
+  local c
+  git rev-list "$@" | while read -r c; do
+    git cat-file commit "$c" |
+      awk '/^$/ { body = 1 } !body && /^gpgsig/ { found = 1 } END { exit !found }' ||
+      git log -1 --format='%h %s' "$c"
+  done
+}
+
+# Branch names are <type>/<description>, for example feat/add-user-subjects.
+# A ticket key may always be given: feat/TIC-123-add-user-subjects. With
+# hooks.requireTicket on it is mandatory, except for the types listed in
+# hooks.ticketlessTypes. Protected branches and bot branches are exempt.
+#
+# Keep in sync with the types in .githooks/commit-msg (scripts/selftest.sh checks).
+branch_types='build|chore|ci|docs|feat|fix|perf|refactor|revert|style|test'
+
+valid_branch_name() {
+  local branch=$1 type rest
+  local shape="^(${branch_types})/(.+)\$"
+  local with_ticket='^[A-Z][A-Z0-9]+-[0-9]+-[a-z0-9]+(-[a-z0-9]+)*$'
+  local plain='^[a-z0-9]+(-[a-z0-9]+)*$'
+  case "$branch" in
+    dependabot/* | renovate/*) return 0 ;;
+  esac
+  [[ "$branch" =~ $shape ]] || return 1
+  type=${BASH_REMATCH[1]}
+  rest=${BASH_REMATCH[2]}
+  [[ "$rest" =~ $with_ticket ]] && return 0
+  [[ "$rest" =~ $plain ]] || return 1
+  [ "$require_ticket" = true ] || return 0
+  in_list "$type" "$ticketless_types"
+}
+
+is_protected() { in_list "${1#refs/heads/}" "$protected"; }
+
+status=0
+while read -r local_ref local_sha remote_ref remote_sha; do
+  [ -n "${local_ref:-}" ] || continue
+
+  # Branch deletion.
+  if [[ "$local_sha" =~ ^0+$ ]]; then
+    if is_protected "$remote_ref"; then
+      say "refusing to delete protected branch ${remote_ref#refs/heads/}."
+      status=1
+    fi
+    continue
+  fi
+
+  # Direct pushes to an existing protected branch (opt-in). Creating the
+  # branch for the first time stays possible, so a new repository can be
+  # bootstrapped.
+  if [ "$block_protected" = true ] && is_protected "$remote_ref" && ! [[ "$remote_sha" =~ ^0+$ ]]; then
+    say "direct pushes to ${remote_ref#refs/heads/} are blocked in this repository (hooks.blockProtectedPush)."
+    say "Push a branch and open a pull request instead."
+    status=1
+    continue
+  fi
+
+  # Branch naming.
+  if [ "$enforce_names" = true ] && [[ "$remote_ref" == refs/heads/* ]] && ! is_protected "$remote_ref"; then
+    branch=${remote_ref#refs/heads/}
+    if ! valid_branch_name "$branch"; then
+      if [ "$require_ticket" = true ]; then
+        say "branch name \"$branch\" does not follow <type>/<TICKET>-<description>."
+        say "  example:  feat/TIC-123-add-user-subjects"
+        say "  ticket may be omitted only for: ${ticketless_types:-(no type)}"
+      else
+        say "branch name \"$branch\" does not follow <type>/<description>."
+        say "  example:  feat/add-user-subjects (a ticket such as TIC-123- may follow the slash)"
+      fi
+      say "  types:    ${branch_types//|/, }"
+      say "  rename:   git branch -m <new-name>"
+      status=1
+    fi
+  fi
+
+  if [[ "$remote_sha" =~ ^0+$ ]]; then
+    # New ref on the remote: scan commits the remote does not have yet.
+    range=("$local_sha" --not "--remotes=$remote_name")
+  elif git cat-file -e "${remote_sha}^{commit}" 2>/dev/null &&
+    git merge-base --is-ancestor "$remote_sha" "$local_sha"; then
+    range=("${remote_sha}..${local_sha}")
+  else
+    # Remote tip is not an ancestor of what we push: history rewrite.
+    if is_protected "$remote_ref"; then
+      say "refusing to force-push protected branch ${remote_ref#refs/heads/}."
+      status=1
+      continue
+    fi
+    range=("$local_sha" --not "--remotes=$remote_name")
+  fi
+
+  if ! scripts/scan-secrets.sh --range -- "${range[@]}"; then
+    say "secrets found in commits being pushed to ${remote_ref}."
+    say "Rewrite those commits to remove the secret, and rotate it if it was ever shared."
+    status=1
+  fi
+
+  if [ "$require_signed" = true ]; then
+    unsigned=$(unsigned_commits "${range[@]}")
+    if [ -n "$unsigned" ]; then
+      say "unsigned commits being pushed to ${remote_ref}:"
+      printf '%s\n' "$unsigned" | sed 's/^/  /' >&2
+      say "Sign the last commit with: git commit --amend --no-edit -S"
+      say "Sign a series with:        git rebase --exec 'git commit --amend --no-edit -S' <base>"
+      say "No signing key yet? See CONTRIBUTING.md."
+      status=1
+    fi
+  fi
+done
+
+exit "$status"

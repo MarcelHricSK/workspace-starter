@@ -1,0 +1,13 @@
+# The owner below is filled in by scripts/init.sh. Change it to the user or
+# team that owns the project. The last matching pattern wins.
+
+# Default owner for everything.
+* @__STARTER_OWNER__
+
+# Guardrails: changes here weaken or strengthen the security of the whole
+# repository, so they always need the owner's review.
+/.github/     @__STARTER_OWNER__
+/.githooks/   @__STARTER_OWNER__
+/.hooksconfig @__STARTER_OWNER__
+/.claude/     @__STARTER_OWNER__
+/scripts/     @__STARTER_OWNER__
