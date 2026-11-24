@@ -96,7 +96,7 @@ ASK = [
 ]
 
 # Writing to the guardrails themselves through the shell needs confirmation.
-GUARDRAIL_PATHS = r"(?:\.claude/(?:settings[\w.]*\.json|hooks\b)|\.githooks\b|\.git/(?:hooks|config)\b|\.github/workflows\b|scripts/scan-secrets\.sh|scripts/check\.d\b|\.hooksconfig\b)"
+GUARDRAIL_PATHS = r"(?:\.claude/(?:settings[\w.]*\.json|hooks\b|skills\b|agents\b)|\.githooks\b|\.git/(?:hooks|config)\b|\.github/workflows\b|scripts/scan-secrets\.sh|scripts/check\.d\b|\.hooksconfig\b)"
 WRITE_OPS = r"(?:>|\btee\b|\bsed\b[^;&|\n]*\s-[a-zA-Z]*i|\bperl\b[^;&|\n]*\s-[a-zA-Z]*i|\b(?:rm|mv|cp|chmod|chown|ln|truncate|install|dd|patch|touch)\b)"
 
 
@@ -108,7 +108,7 @@ def decide(command):
         if re.search(pattern, command):
             return "deny", reason
     if re.search(GUARDRAIL_PATHS, command) and re.search(WRITE_OPS, command):
-        return "ask", "modifies the repository's guardrails (hooks, Claude settings or workflows)"
+        return "ask", "modifies the repository's guardrails (hooks, Claude settings, skills or agents, or workflows)"
     for pattern, reason in ASK:
         if re.search(pattern, command):
             return "ask", reason

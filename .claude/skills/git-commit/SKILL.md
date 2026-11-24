@@ -1,6 +1,10 @@
 ---
 name: git-commit
 description: Commit-message, branch, staging and signing conventions enforced by this repository's git hooks. Read before staging changes, drafting or amending a commit, creating a branch, or pushing, and whenever a git hook rejects something.
+license: LicenseRef-MarcelHric-Proprietary
+metadata:
+  author: Marcel Hric
+  version: "1.0.0"
 ---
 
 # Git commits & branches

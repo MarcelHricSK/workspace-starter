@@ -2,8 +2,8 @@
 """PreToolUse guard for file tools (Read, Edit, Write, MultiEdit, NotebookEdit, Grep).
 
   deny  - secret files (any access) and .git internals (writes)
-  ask   - edits to the guardrails themselves: git hooks, Claude Code settings
-          and hooks, CI workflows, CODEOWNERS, the secret scanner
+  ask   - edits to the guardrails themselves: git hooks, Claude Code settings,
+          hooks, skills and agents, CI workflows, CODEOWNERS, the secret scanner
   (no output) - no opinion; the normal permission rules decide
 
 Paths are checked both as given and with symlinks resolved, case-insensitively.
@@ -34,6 +34,7 @@ SECRET_PATH_EXCEPTIONS = ["*.pub", "*/known_hosts"]
 # is protected the same way.
 GUARDRAIL_GLOBS = [
     ".claude/settings.json", ".claude/settings.local.json", ".claude/hooks/*",
+    ".claude/skills/*", ".claude/agents/*",
     ".githooks/*", ".github/workflows/*", ".github/codeowners", ".github/dependabot.yml",
     "scripts/scan-secrets.sh", "scripts/check.d/*", ".secretscanignore", ".hooksconfig",
 ]

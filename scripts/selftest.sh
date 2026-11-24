@@ -355,6 +355,9 @@ ask|find . -type f -exec rm {} ;
 ask|sudo apt-get install jq
 ask|printenv
 ask|echo x > .claude/settings.json
+ask|echo x > .claude/skills/demo/SKILL.md
+ask|rm -rf .claude/agents
+pass|cat .claude/skills/git-commit/SKILL.md
 ask|sed -i s/a/b/ .githooks/pre-commit
 ask|chmod -R 777 .
 CASES
@@ -382,6 +385,11 @@ deny|Edit|.git/config
 deny|Write|.git/hooks/pre-commit
 ask|Edit|.claude/settings.json
 ask|Write|.claude/hooks/guard_bash.py
+ask|Edit|.claude/skills/git-commit/SKILL.md
+ask|Write|.claude/skills/new-skill/SKILL.md
+ask|Write|.claude/agents/reviewer.md
+ask|Edit|starters/base/.claude/skills/git-commit/SKILL.md
+pass|Read|.claude/skills/git-commit/SKILL.md
 ask|Edit|.githooks/pre-commit
 ask|Edit|.github/workflows/ci.yml
 ask|Edit|scripts/scan-secrets.sh
@@ -396,6 +404,42 @@ pass|Edit|scripts/check.sh
 CASES
 else
   printf 'Claude Code guard hooks: skipped (python3 or hooks not present)\n'
+fi
+
+# --- Skill and agent lint ---------------------------------------------------
+if [ -x "$root/scripts/lint-agent-files.sh" ] && command -v python3 >/dev/null 2>&1; then
+  printf 'Skill and agent lint\n'
+  lint_case=0
+  # lint_skill <frontmatter-and-body>: a fresh skill directory holding one skill.
+  lint_skill() {
+    lint_case=$((lint_case + 1))
+    local dir="$work/lint$lint_case/skills"
+    mkdir -p "$dir/demo"
+    printf '%s\n' "$1" >"$dir/demo/SKILL.md"
+    (cd "$root" && scripts/lint-agent-files.sh "$dir")
+  }
+  lint_agent() {
+    lint_case=$((lint_case + 1))
+    local dir="$work/lint$lint_case/agents"
+    mkdir -p "$dir"
+    printf '%s\n' "$1" >"$dir/demo.md"
+    (cd "$root" && scripts/lint-agent-files.sh "$dir")
+  }
+  fm=$'---\nname: demo\ndescription: A demo.'
+  expect_ok "valid skill" lint_skill "$fm"$'\n---\n\nRun `git status`, mark breaking changes with `!` before the colon.'
+  expect_ok "valid agent" lint_agent "$fm"$'\ntools: Read, Grep\n---\n\nReview.'
+  expect_fail "skill without frontmatter" "no frontmatter" lint_skill "Just text."
+  expect_fail "skill without description" "no description" lint_skill $'---\nname: demo\n---'
+  expect_fail "skill name differs from directory" "does not match" lint_skill $'---\nname: other\ndescription: A demo.\n---'
+  expect_fail "allowed-tools pre-approves Bash" "must not pre-approve Bash" lint_skill "$fm"$'\nallowed-tools: Read, Bash(npm *)\n---'
+  expect_fail "skill with hooks" "hooks are not allowed" lint_skill "$fm"$'\nhooks:\n  PreToolUse: []\n---'
+  expect_fail "inline shell injection" "dynamic shell injection" lint_skill "$fm"$'\n---\n\nBranch: !`git branch --show-current`'
+  expect_fail "block shell injection" "dynamic shell injection" lint_skill "$fm"$'\n---\n\n```!\ngit status\n```'
+  expect_fail "agent with permissionMode" "must not set permissionMode" lint_agent "$fm"$'\npermissionMode: bypassPermissions\n---'
+  long=$(printf 'line\n%.0s' $(seq 1 501))
+  expect_fail "oversized SKILL.md" "longer than 500 lines" lint_skill "$fm"$'\n---\n'"$long"
+else
+  printf 'Skill and agent lint: skipped (python3 or lint script not present)\n'
 fi
 
 printf 'self-test: %s passed, %s failed\n' "$pass" "$failures"
