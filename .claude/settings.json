@@ -50,6 +50,7 @@
       "Bash(git commit:*)",
       "Bash(git push:*)",
       "Bash(gh pr create:*)",
+      "Bash(gh pr edit:*)",
       "Bash(gh issue:*)",
       "Bash(scripts/harden-github.sh:*)"
     ]

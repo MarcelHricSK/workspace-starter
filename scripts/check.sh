@@ -91,6 +91,11 @@ sys.exit(0 if ok else 1)
 PY
 fi
 
+step "Claude Code skills and agents"
+if need python3; then
+  scripts/lint-agent-files.sh || fail "skills and agents"
+fi
+
 step "Workflows: third-party actions pinned to a commit SHA"
 unpinned=$(grep -rnE '^[[:space:]]*(-[[:space:]]+)?uses:[[:space:]]' .github/workflows 2>/dev/null |
   grep -vE 'uses:[[:space:]]+(\./|docker://[^[:space:]]+@sha256:[0-9a-f]{64}|[^@[:space:]]+@[0-9a-f]{40}([[:space:]]|$))' || true)

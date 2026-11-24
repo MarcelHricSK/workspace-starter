@@ -155,15 +155,24 @@ touching the workflow.
 
 `.claude/settings.json` is shared by everyone who opens the repository with Claude Code.
 
-- **Permission rules** allow routine read-only commands, ask before commit, push and
-  pull request creation, and deny reading secret files and merging pull requests.
+- **Permission rules** allow routine read-only commands, ask before commit, push,
+  creating a pull request and editing one's title or description, and deny reading
+  secret files and merging pull requests.
   `find` is deliberately not auto-allowed: it can delete files and run other programs.
 - **`guard_bash.py`** denies commands that touch credential files, force-push, skip git
   hooks, pipe downloads into a shell or delete from the root, home or working directory.
   It also denies turning off commit signing. It asks for confirmation on recursive
   deletes, `sudo`, history rewrites and anything that modifies the guardrails.
 - **`guard_files.py`** denies any access to secret files and writes inside `.git`, and
-  asks before edits to hooks, Claude settings, workflows, CODEOWNERS or the scanner.
+  asks before edits to hooks, Claude settings, skills, agents, workflows, CODEOWNERS or
+  the scanner.
+- **Skills** in `.claude/skills/`: `git-commit` (the conventions the git hooks enforce),
+  `github-create-pr` (opens a pull request that follows `.github/pull_request_template.md`
+  and never merges) and `create-skill` (`/create-skill <description>` drafts a new skill).
+- **`scripts/lint-agent-files.sh`**, run by `scripts/check.sh`, holds skills and agents
+  to the guardrails' standard: valid frontmatter whose name matches the directory or
+  file, a description, no `Bash` in `allowed-tools`, no hooks, no `permissionMode` on an
+  agent, and no shell output injected into the prompt.
 
 The hooks are configured to fail closed: if `python3` is missing, the guarded tools
 are blocked rather than allowed. Hooks run in every permission mode.
